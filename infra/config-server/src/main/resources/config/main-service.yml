@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: ${MAIN_DB_URL:jdbc:postgresql://localhost:5432/explore_with_me}
+    username: ${MAIN_DB_USER:root}
+    password: ${MAIN_DB_PASSWORD:root}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false

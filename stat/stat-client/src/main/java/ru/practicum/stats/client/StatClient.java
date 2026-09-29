@@ -4,14 +4,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.MaxAttemptsRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.stats.dto.EndpointHitDto;
 import ru.practicum.stats.dto.ViewStatsDto;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -23,11 +29,16 @@ public class StatClient {
 
     private static final Logger log = LoggerFactory.getLogger(StatClient.class);
     private final RestClient restClient;
+    private final DiscoveryClient discoveryClient;
+    private final RetryTemplate retryTemplate;
+
+    @Value("${stats-service.id:stat-server}")
+    private String statsServiceId;
 
     @Autowired
-    public StatClient(@Value("${client.url}") String statUrl) {
+    public StatClient(DiscoveryClient discoveryClient) {
+        this.discoveryClient = discoveryClient;
         this.restClient = RestClient.builder()
-                .baseUrl(statUrl)
                 .defaultHeader("Content-Type", "application/json")
                 .defaultStatusHandler(HttpStatusCode::is4xxClientError, (request, response) -> {
                     log.error("Client error: {} - {}", response.getStatusCode(),
@@ -38,10 +49,41 @@ public class StatClient {
                             new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8));
                 })
                 .build();
+
+        this.retryTemplate = new RetryTemplate();
+        FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy();
+        fixedBackOffPolicy.setBackOffPeriod(3000L);
+        this.retryTemplate.setBackOffPolicy(fixedBackOffPolicy);
+
+        MaxAttemptsRetryPolicy retryPolicy = new MaxAttemptsRetryPolicy();
+        retryPolicy.setMaxAttempts(3);
+        this.retryTemplate.setRetryPolicy(retryPolicy);
     }
 
-    public StatClient(RestClient restClient) {
+    public StatClient(RestClient restClient, DiscoveryClient discoveryClient) {
         this.restClient = restClient;
+        this.discoveryClient = discoveryClient;
+        this.retryTemplate = new RetryTemplate();
+    }
+
+    private ServiceInstance getInstance() {
+        try {
+            List<ServiceInstance> instances = discoveryClient.getInstances(statsServiceId);
+            if (instances.isEmpty()) {
+                instances = discoveryClient.getInstances("stats-server");
+            }
+            return instances.getFirst();
+        } catch (Exception exception) {
+            throw new StatsServerUnavailable(
+                    "Ошибка обнаружения адреса сервиса статистики с id: " + statsServiceId,
+                    exception
+            );
+        }
+    }
+
+    private URI makeUri(String path) {
+        ServiceInstance instance = retryTemplate.execute(cxt -> getInstance());
+        return URI.create("http://" + instance.getHost() + ":" + instance.getPort() + path);
     }
 
     public void hit(String app, String uri, String ip, LocalDateTime timestamp) {
@@ -54,7 +96,7 @@ public class StatClient {
 
         try {
             restClient.post()
-                    .uri("/hit")
+                    .uri(makeUri("/hit"))
                     .body(dto)
                     .retrieve()
                     .toBodilessEntity();
@@ -70,23 +112,33 @@ public class StatClient {
                                       LocalDateTime end,
                                       List<String> uris,
                                       Boolean unique) {
-        DateTimeFormatter formatter =
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/stats")
-                .queryParam("start", start.format(formatter))
-                .queryParam("end", end.format(formatter))
-                .queryParam("unique", unique);
-
-        if (uris != null && !uris.isEmpty()) {
-            for (String uri : uris) {
-                builder.queryParam("uris", uri);
-            }
-        }
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         try {
+            ServiceInstance instance = retryTemplate.execute(cxt -> getInstance());
+
+            UriComponentsBuilder builder = UriComponentsBuilder.newInstance()
+                    .scheme("http")
+                    .host(instance.getHost())
+                    .port(instance.getPort())
+                    .path("/stats")
+                    .queryParam("start", start.format(formatter))
+                    .queryParam("end", end.format(formatter));
+
+            if (unique != null) {
+                builder.queryParam("unique", unique);
+            }
+
+            if (uris != null && !uris.isEmpty()) {
+                for (String uri : uris) {
+                    builder.queryParam("uris", uri);
+                }
+            }
+
+            URI fullUri = builder.build().encode().toUri();
+
             List<ViewStatsDto> stats = restClient.get()
-                    .uri(builder.build().encode().toString())
+                    .uri(fullUri)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<ViewStatsDto>>() {
                     });
