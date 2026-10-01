@@ -16,14 +16,6 @@ spring:
         locator:
           enabled: true
       routes:
-        - id: stats-server-hit-route
-          uri: lb://stats-server
-          predicates:
-            - Path=/hit, /hit/**
-        - id: stats-server-stats-route
-          uri: lb://stats-server
-          predicates:
-            - Path=/stats, /stats/**
         - id: main-service-route
           uri: lb://main-service
           predicates:
