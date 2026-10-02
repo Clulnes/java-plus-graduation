@@ -8,8 +8,6 @@ import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.retry.backoff.FixedBackOffPolicy;
-import org.springframework.retry.policy.MaxAttemptsRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -36,8 +34,9 @@ public class StatClient {
     private String statsServiceId;
 
     @Autowired
-    public StatClient(DiscoveryClient discoveryClient) {
+    public StatClient(DiscoveryClient discoveryClient, RetryTemplate retryTemplate) {
         this.discoveryClient = discoveryClient;
+        this.retryTemplate = retryTemplate;
         this.restClient = RestClient.builder()
                 .defaultHeader("Content-Type", "application/json")
                 .defaultStatusHandler(HttpStatusCode::is4xxClientError, (request, response) -> {
@@ -49,21 +48,12 @@ public class StatClient {
                             new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8));
                 })
                 .build();
-
-        this.retryTemplate = new RetryTemplate();
-        FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy();
-        fixedBackOffPolicy.setBackOffPeriod(3000L);
-        this.retryTemplate.setBackOffPolicy(fixedBackOffPolicy);
-
-        MaxAttemptsRetryPolicy retryPolicy = new MaxAttemptsRetryPolicy();
-        retryPolicy.setMaxAttempts(3);
-        this.retryTemplate.setRetryPolicy(retryPolicy);
     }
 
-    public StatClient(RestClient restClient, DiscoveryClient discoveryClient) {
+    public StatClient(RestClient restClient, DiscoveryClient discoveryClient, RetryTemplate retryTemplate) {
         this.restClient = restClient;
         this.discoveryClient = discoveryClient;
-        this.retryTemplate = new RetryTemplate();
+        this.retryTemplate = retryTemplate;
     }
 
     private ServiceInstance getInstance() {

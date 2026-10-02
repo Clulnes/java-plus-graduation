@@ -8,3 +8,8 @@ eureka:
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${random.value}
+
+stats-client:
+  retry:
+    backoff-period: 3000
+    max-attempts: 3
