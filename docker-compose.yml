@@ -1,4 +1,4 @@
- services:
+services:
   stats-db:
     image: postgres:16.1
     container_name: postgres-ewm-stats-db
@@ -10,7 +10,7 @@
       - POSTGRES_DB=ewm-stats
     volumes:
       - stats-db-data:/var/lib/postgresql/data/
-      - ./stat/stat-server/src/main/resources/schema-stat.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./stats/stats-server/src/main/resources/schema-stat.sql:/docker-entrypoint-initdb.d/01-init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stat -d ewm-stats"]
       timeout: 5s
@@ -19,7 +19,7 @@
     restart: on-failure
 
   stats-server:
-    build: stat/stat-server
+    build: ./stats/stats-server
     container_name: stat-server
     ports:
       - "9090:9090"
@@ -43,7 +43,7 @@
       - POSTGRES_DB=ewm-main
     volumes:
       - ewm-db-data:/var/lib/postgresql/data/
-      - ./main-service/src/main/resources/schema-main.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./core/main-service/src/main/resources/schema-main.sql:/docker-entrypoint-initdb.d/01-init.sql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U main -d ewm-main" ]
       timeout: 5s
@@ -52,7 +52,7 @@
     restart: on-failure
 
   ewm-service:
-    build: ./main-service
+    build: ./core/main-service
     container_name: ewm-service
     ports:
       - "8080:8080"
@@ -66,6 +66,6 @@
       - SPRING_DATASOURCE_PASSWORD=main
     restart: on-failure
 
- volumes:
-   stats-db-data:
-   ewm-db-data:
+volumes:
+  stats-db-data:
+  ewm-db-data:
