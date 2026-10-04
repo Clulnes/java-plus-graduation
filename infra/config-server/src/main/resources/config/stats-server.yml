@@ -1,0 +1,13 @@
+server:
+  port: 0
+
+spring:
+  datasource:
+    url: ${STATS_DB_URL:jdbc:postgresql://localhost:5432/stats}
+    username: ${STATS_DB_USER:root}
+    password: ${STATS_DB_PASSWORD:root}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
