@@ -27,9 +27,9 @@ public class ErrorHandler {
                 .build();
     }
 
-    @ExceptionHandler(ConflictException.class)
+    @ExceptionHandler({ConflictException.class, org.springframework.dao.DataIntegrityViolationException.class})
     @ResponseStatus(HttpStatus.CONFLICT)
-    public ApiError handleConflict(final ConflictException e) {
+    public ApiError handleConflict(final Exception e) {
         log.error("409 Conflict: {}", e.getMessage());
         return ApiError.builder()
                 .errors(Collections.emptyList())
