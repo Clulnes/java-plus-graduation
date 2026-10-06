@@ -129,9 +129,9 @@ public class RequestServiceImpl {
             throw new ConflictException("The request to own event is rejected");
         }
 
-        int limit = event.getParticipantLimit();
-        int confirmedRequests = event.getConfirmedRequests();
-        if (limit == confirmedRequests && limit != 0) {
+        int limit = event.getParticipantLimit() == null ? 0 : event.getParticipantLimit();
+        int confirmedRequests = event.getConfirmedRequests() == null ? 0 : event.getConfirmedRequests();
+        if (limit > 0 && confirmedRequests >= limit) {
             throw new ConflictException("The participant limit has been reached to event id: " + eventId);
         }
 
@@ -150,7 +150,7 @@ public class RequestServiceImpl {
                 .status(RequestStatus.PENDING)
                 .build();
 
-        if (!event.getRequestModeration() || limit == 0) {
+        if (Boolean.FALSE.equals(event.getRequestModeration()) || limit == 0) {
             request.setStatus(RequestStatus.CONFIRMED);
             eventClient.incrementConfirmedRequests(event.getId());
         }

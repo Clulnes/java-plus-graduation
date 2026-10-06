@@ -1,6 +1,7 @@
 package ru.practicum.ewm.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.EventInternalDto;
 import ru.practicum.ewm.dao.EventRepository;
@@ -31,20 +32,34 @@ public class InternalEventController {
     }
 
     @PostMapping("/{eventId}/increment-confirmed")
+    @Transactional
     public void incrementConfirmedRequests(@PathVariable Long eventId) {
-        eventRepository.updateIncrementConfirmedRequests(eventId);
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event not found"));
+        int current = event.getConfirmedRequests() == null ? 0 : event.getConfirmedRequests();
+        event.setConfirmedRequests(current + 1);
+        eventRepository.save(event);
     }
 
     @PostMapping("/{eventId}/decrement-confirmed")
+    @Transactional
     public void decrementConfirmedRequests(@PathVariable Long eventId) {
-        eventRepository.updateDecrementConfirmedRequests(eventId);
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event not found"));
+        int current = event.getConfirmedRequests() == null ? 0 : event.getConfirmedRequests();
+        if (current > 0) {
+            event.setConfirmedRequests(current - 1);
+            eventRepository.save(event);
+        }
     }
 
     @PostMapping("/{eventId}/add-confirmed")
+    @Transactional
     public void addConfirmedRequests(@PathVariable Long eventId, @RequestParam Integer count) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
-        event.setConfirmedRequests(event.getConfirmedRequests() + count);
+        int current = event.getConfirmedRequests() == null ? 0 : event.getConfirmedRequests();
+        event.setConfirmedRequests(current + count);
         eventRepository.save(event);
     }
 }
