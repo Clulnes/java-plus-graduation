@@ -60,8 +60,8 @@ spring:
           predicates:
             - Path=/admin/comments/**
 
-        - id: main-service-route
-          uri: lb://main-service
+        - id: event-service-route
+          uri: lb://event-service
           predicates:
             - Path=/**
 

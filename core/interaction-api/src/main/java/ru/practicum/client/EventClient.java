@@ -4,7 +4,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.EventInternalDto;
 
-@FeignClient(name = "main-service", path = "/internal/events")
+@FeignClient(name = "event-service", path = "/internal/events")
 public interface EventClient {
 
     @GetMapping("/{eventId}")

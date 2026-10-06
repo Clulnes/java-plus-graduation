@@ -19,7 +19,7 @@ routes:
     uri: lb://request-service
     predicates:
       - Path=/users/*/events/*/requests, /users/*/events/*/requests/**
-  - id: main-service-route
-    uri: lb://main-service
+  - id: event-service-route
+    uri: lb://event-service
     predicates:
       - Path=/**
