@@ -152,7 +152,11 @@ public class RequestServiceImpl {
 
         if (Boolean.FALSE.equals(event.getRequestModeration()) || limit == 0) {
             request.setStatus(RequestStatus.CONFIRMED);
-            eventClient.incrementConfirmedRequests(event.getId());
+            try {
+                eventClient.incrementConfirmedRequests(event.getId());
+            } catch (Exception e) {
+                log.warn("Failed to increment confirmed requests count for event {}: {}", event.getId(), e.getMessage());
+            }
         }
 
         request = requestRepository.save(request);

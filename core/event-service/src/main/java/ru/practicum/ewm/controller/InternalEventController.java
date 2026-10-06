@@ -16,7 +16,7 @@ public class InternalEventController {
     private final EventRepository eventRepository;
 
     @GetMapping("/{eventId}")
-    public EventInternalDto getEventById(@PathVariable Long eventId) {
+    public EventInternalDto getEventById(@PathVariable("eventId") Long eventId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Field: eventId. Error: event не найден. Value: " + eventId));
 
@@ -33,7 +33,7 @@ public class InternalEventController {
 
     @PostMapping("/{eventId}/increment-confirmed")
     @Transactional
-    public void incrementConfirmedRequests(@PathVariable Long eventId) {
+    public void incrementConfirmedRequests(@PathVariable("eventId") Long eventId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         int current = event.getConfirmedRequests() == null ? 0 : event.getConfirmedRequests();
@@ -43,7 +43,7 @@ public class InternalEventController {
 
     @PostMapping("/{eventId}/decrement-confirmed")
     @Transactional
-    public void decrementConfirmedRequests(@PathVariable Long eventId) {
+    public void decrementConfirmedRequests(@PathVariable("eventId") Long eventId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         int current = event.getConfirmedRequests() == null ? 0 : event.getConfirmedRequests();
@@ -55,7 +55,7 @@ public class InternalEventController {
 
     @PostMapping("/{eventId}/add-confirmed")
     @Transactional
-    public void addConfirmedRequests(@PathVariable Long eventId, @RequestParam Integer count) {
+    public void addConfirmedRequests(@PathVariable("eventId") Long eventId, @RequestParam("count") Integer count) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         int current = event.getConfirmedRequests() == null ? 0 : event.getConfirmedRequests();
