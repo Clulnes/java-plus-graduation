@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.dto.*;
 import ru.practicum.ewm.service.EventService;
-import ru.practicum.ewm.service.ParticipationRequestService;
 
 import java.util.List;
 
@@ -20,7 +19,6 @@ import java.util.List;
 public class UserEventsController {
 
     private final EventService eventService;
-    private final ParticipationRequestService requestService;
 
     @PostMapping()
     @ResponseStatus(HttpStatus.CREATED)
@@ -62,25 +60,4 @@ public class UserEventsController {
 
         return eventService.getPrivateEvents(userId, from, size);
     }
-
-    @GetMapping("/{eventId}/requests")
-    @ResponseStatus(HttpStatus.OK)
-    public List<ParticipationRequestDto> getOwnParticipationRequests(@PathVariable Long userId, @PathVariable Long eventId) {
-        log.info("GET /users/{}/events/{}/requests", userId, eventId);
-
-        return requestService.getRequestsByEventId(userId, eventId);
-    }
-
-    @PatchMapping("/{eventId}/requests")
-    @ResponseStatus(HttpStatus.OK)
-    public EventRequestStatusUpdateResult updateRequestsToOwnEvent(@PathVariable Long userId,
-                                                                         @PathVariable Long eventId,
-                                                                         @Valid @RequestBody
-                                                                             EventRequestStatusUpdateRequest request) {
-        log.info("PATCH /users/{}/events/{}/requests with body: {}", userId, eventId, request);
-
-        return requestService.updateOwnParticipationRequests(userId, eventId, request);
-    }
-
-
 }

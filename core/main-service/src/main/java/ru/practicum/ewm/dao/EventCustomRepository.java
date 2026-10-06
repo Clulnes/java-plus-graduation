@@ -6,7 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import ru.practicum.ewm.dto.AdminEventSearchParams;
 import ru.practicum.ewm.dto.EventSearchParams;
-import ru.practicum.ewm.model.*;
+import ru.practicum.ewm.model.Event;
+import ru.practicum.ewm.model.EventState;
+import ru.practicum.ewm.model.QEvent;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -88,7 +90,6 @@ public class EventCustomRepository {
                                                    QEvent event) {
         BooleanExpression predicate = event.state.eq(EventState.PUBLISHED);
 
-        // Поиск по тексту
         if (params.getText() != null && !params.getText().isBlank()) {
             String searchPattern = "%" + params.getText().toLowerCase() + "%";
             predicate = predicate.and(
@@ -97,23 +98,19 @@ public class EventCustomRepository {
             );
         }
 
-        // Фильтр по категориям
         if (params.getCategories() != null && !params.getCategories().isEmpty()) {
             predicate = predicate.and(event.category.id.in(params.getCategories()));
         }
 
-        // Фильтр по платности
         if (params.getPaid() != null) {
             predicate = predicate.and(event.paid.eq(params.getPaid()));
         }
 
-        // Фильтр по диапазону дат
         predicate = predicate.and(event.eventDate.goe(rangeStart));
         if (rangeEnd != null) {
             predicate = predicate.and(event.eventDate.loe(rangeEnd));
         }
 
-        // Фильтр "только доступные" (лимит не превышен)
         if (params.getOnlyAvailable() != null && params.getOnlyAvailable()) {
             predicate = predicate.and(buildOnlyAvailablePredicate(event));
         }
@@ -132,12 +129,10 @@ public class EventCustomRepository {
                                                   boolean categoriesEmpty) {
         BooleanExpression predicate = null;
 
-        // Фильтр по пользователям
         if (!usersEmpty && users != null && !users.isEmpty()) {
             predicate = and(predicate, event.initiator.id.in(users));
         }
 
-        // Фильтр по статусам
         if (!statesEmpty && states != null && !states.isEmpty()) {
             List<EventState> statesList = states.stream()
                     .map(String::trim)
@@ -146,29 +141,19 @@ public class EventCustomRepository {
             predicate = and(predicate, event.state.in(statesList));
         }
 
-        // Фильтр по категориям
         if (!categoriesEmpty && categories != null && !categories.isEmpty()) {
             predicate = and(predicate, event.category.id.in(categories));
         }
 
-        // Фильтр по диапазону дат
         predicate = and(predicate, event.eventDate.goe(rangeStart));
         predicate = and(predicate, event.eventDate.loe(rangeEnd));
 
-        // Если нет условий, возвращаем "всегда true"
         return predicate != null ? predicate : event.isNotNull();
     }
 
     private BooleanExpression buildOnlyAvailablePredicate(QEvent event) {
-        QParticipationRequest request = QParticipationRequest.participationRequest;
-
         return event.participantLimit.eq(0)
-                .or(event.participantLimit.gt(
-                        queryFactory.select(request.count())
-                                .from(request)
-                                .where(request.event.eq(event)
-                                        .and(request.status.eq(RequestStatus.CONFIRMED)))
-                ));
+                .or(event.participantLimit.gt(event.confirmedRequests));
     }
 
     private BooleanExpression and(BooleanExpression current, BooleanExpression newCondition) {

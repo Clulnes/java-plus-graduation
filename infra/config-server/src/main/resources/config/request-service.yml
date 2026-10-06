@@ -1,0 +1,27 @@
+server:
+  port: 0
+
+spring:
+  datasource:
+    url: ${MAIN_DB_URL:jdbc:postgresql://localhost:6541/ewm-main}
+    username: ${MAIN_DB_USER:main}
+    password: ${MAIN_DB_PASSWORD:main}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+routes:
+  - id: request-service-user-requests
+    uri: lb://request-service
+    predicates:
+      - Path=/users/*/requests, /users/*/requests/**
+  - id: request-service-event-requests
+    uri: lb://request-service
+    predicates:
+      - Path=/users/*/events/*/requests, /users/*/events/*/requests/**
+  - id: main-service-route
+    uri: lb://main-service
+    predicates:
+      - Path=/**

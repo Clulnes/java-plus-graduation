@@ -9,3 +9,17 @@ management:
   endpoint:
     gateway:
       enabled: true
+
+routes:
+  - id: request-service-user-requests
+    uri: lb://request-service
+    predicates:
+      - Path=/users/*/requests, /users/*/requests/**
+  - id: request-service-event-requests
+    uri: lb://request-service
+    predicates:
+      - Path=/users/*/events/*/requests, /users/*/events/*/requests/**
+  - id: main-service-route
+    uri: lb://main-service
+    predicates:
+      - Path=/**
