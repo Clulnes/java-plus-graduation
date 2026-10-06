@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.client.UserClient;
+import ru.practicum.dto.UserDto;
 import ru.practicum.ewm.dao.*;
 import ru.practicum.ewm.dto.*;
 import ru.practicum.ewm.exception.ConflictException;
@@ -16,10 +18,9 @@ import ru.practicum.ewm.model.*;
 import ru.practicum.stats.client.StatClient;
 import ru.practicum.stats.dto.ViewStatsDto;
 
-import java.time.format.DateTimeParseException;
-import java.util.Collection;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
@@ -34,12 +35,25 @@ public class EventServiceImpl implements EventService {
     private final LocationRepository locationRepository;
     private final CategoryRepository categoryRepository;
     private final StatClient statClient;
+    private final UserClient userClient;
 
     @Override
     @Transactional
     public EventFullDto addEvent(Long userId, NewEventDto dto) {
+        UserDto userDto;
+        try {
+            userDto = userClient.getUserById(userId);
+        } catch (Exception e) {
+            throw new NotFoundException("Field: initiator. Error: id не найден. Value: " + userId);
+        }
+
         User initiator = userRepository.findById(userId)
-                .orElseThrow(() -> new ConflictException("Field: initiator. Error: id не найден. Value: " + userId));
+                .orElseGet(() -> userRepository.save(User.builder()
+                        .id(userDto.getId())
+                        .name(userDto.getName())
+                        .email(userDto.getEmail())
+                        .build()));
+
         Category category = getCategoryByIdWithValidation(dto.getCategory());
         Location location = getLocation(dto.getLocation().getLat(), dto.getLocation().getLon());
         LocalDateTime eventDate = getEventDateWithValidation(dto.getEventDate());
@@ -53,9 +67,9 @@ public class EventServiceImpl implements EventService {
                 .initiator(initiator)
                 .location(location)
                 .confirmedRequests(0)
-                .participantLimit(dto.getParticipantLimit())
-                .paid(dto.getPaid())
-                .requestModeration(dto.getRequestModeration())
+                .participantLimit(dto.getParticipantLimit() == null ? 0 : dto.getParticipantLimit())
+                .paid(dto.getPaid() != null && dto.getPaid())
+                .requestModeration(dto.getRequestModeration() == null || dto.getRequestModeration())
                 .created(LocalDateTime.now())
                 .state(EventState.PENDING)
                 .build();
@@ -70,13 +84,12 @@ public class EventServiceImpl implements EventService {
     @Override
     public EventFullDto getPrivateEvent(Long userId, Long eventId) {
         Event event = getEventIfExistWithOwnerValidation(eventId, userId);
-
         ViewStatsDto stat = getStatByEvent(event, false);
-
         return EventMapper.toFullDto(event, stat.getHits());
     }
 
     @Override
+    @Transactional
     public EventFullDto updateEvent(Long userId, Long eventId,
                                     UpdateEventUserRequest request) {
         Event event = getEventIfExistWithOwnerValidation(eventId, userId);
@@ -91,17 +104,22 @@ public class EventServiceImpl implements EventService {
         eventRepository.save(event);
 
         ViewStatsDto stat = getStatByEvent(event, false);
-
         return EventMapper.toFullDto(event, stat.getHits());
     }
 
     @Override
     public List<EventShortDto> getPrivateEvents(long userId, int from, int size) {
-        if (!userRepository.existsById(userId)) {
-            throw new ValidationException("Field: userId. Error: id не найден. Value: " + userId);
+        Boolean exists = false;
+        try {
+            exists = userClient.existsById(userId);
+        } catch (Exception ignored) {
         }
 
-        List<Event> events = eventCustomRepository.findUserEventsWithPagination(userId, from,  size);
+        if (!Boolean.TRUE.equals(exists) && !userRepository.existsById(userId)) {
+            throw new NotFoundException("Field: userId. Error: id не найден. Value: " + userId);
+        }
+
+        List<Event> events = eventCustomRepository.findUserEventsWithPagination(userId, from, size);
         if (events.isEmpty()) {
             return Collections.emptyList();
         }
@@ -120,7 +138,6 @@ public class EventServiceImpl implements EventService {
     @Override
     public List<EventShortDto> getPublicEvents(EventSearchParams params,
                                                HttpServletRequest request) {
-
         LocalDateTime rangeStart = params.getRangeStart();
         LocalDateTime rangeEnd = params.getRangeEnd();
 
@@ -135,7 +152,6 @@ public class EventServiceImpl implements EventService {
         }
 
         List<Event> events = eventCustomRepository.findPublicEventsWithPagination(params, rangeStart, rangeEnd);
-
         if (events.isEmpty()) {
             return Collections.emptyList();
         }
@@ -155,10 +171,7 @@ public class EventServiceImpl implements EventService {
 
         if (params.getSort() == EventSort.VIEWS) {
             return result.stream()
-                    .sorted(
-                            Comparator.comparingLong(EventShortDto::getViews)
-                                    .reversed()
-                    )
+                    .sorted(Comparator.comparingLong(EventShortDto::getViews).reversed())
                     .toList();
         }
 
@@ -192,8 +205,6 @@ public class EventServiceImpl implements EventService {
         );
 
         ViewStatsDto stat = getStatByEvent(event, true);
-        log.info("получение статистики события {} просмотров: {}", event.getId(), stat.getHits());
-
         return EventMapper.toFullDto(event, stat.getHits());
     }
 
@@ -282,9 +293,7 @@ public class EventServiceImpl implements EventService {
             updateAdminState(event, request.getStateAction());
         }
 
-        log.info("Запись в базу данных обновленного администратором события: {}", event);
         eventRepository.save(event);
-
         ViewStatsDto stat = getStatByEvent(event, false);
 
         return EventMapper.toFullDto(event, stat.getHits());
@@ -306,16 +315,16 @@ public class EventServiceImpl implements EventService {
 
     private Category getCategoryByIdWithValidation(Long id) {
         return categoryRepository.findById(id)
-                .orElseThrow(() -> new ValidationException("Категория с id=" + id + " не найдена"));
+                .orElseThrow(() -> new NotFoundException("Категория с id=" + id + " не найдена"));
     }
 
     private LocalDateTime getEventDateWithValidation(String date) {
         LocalDateTime eventDate;
-        if (!date.isBlank()) {
+        if (date != null && !date.isBlank()) {
             eventDate = LocalDateTime.parse(date, FORMATTER);
 
             if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-                throw new ValidationException("Field: eventDate. Error: Начало события должно быть позже" +
+                throw new ValidationException("Field: eventDate. Error: Начало события должно быть позже " +
                         LocalDateTime.now().plusHours(2) + ". Value: " + eventDate);
             }
         } else {
@@ -326,8 +335,6 @@ public class EventServiceImpl implements EventService {
 
     private ViewStatsDto getStatByEvent(Event event, boolean uniq) {
         String uri = "/events/" + event.getId();
-
-        log.info("Запрос статистики из stat-db для события: {}", event.getId());
         List<ViewStatsDto> dtos = statClient.getStat(
                 event.getCreated(),
                 LocalDateTime.now(),
@@ -357,7 +364,6 @@ public class EventServiceImpl implements EventService {
     }
 
     private Map<Long, Long> getStatsByUris(List<String> uris) {
-
         List<ViewStatsDto> stats = statClient.getStat(LocalDateTime.MIN, LocalDateTime.MAX, uris, false);
 
         if (stats == null || stats.isEmpty()) {
@@ -367,9 +373,7 @@ public class EventServiceImpl implements EventService {
         Map<Long, Long> viewsMap = new LinkedHashMap<>();
         for (ViewStatsDto dto : stats) {
             String uri = dto.getUri();
-            Long id = Long.parseLong(
-                    uri.substring(
-                    uri.lastIndexOf('/') + 1));
+            Long id = Long.parseLong(uri.substring(uri.lastIndexOf('/') + 1));
             viewsMap.put(id, dto.getHits());
         }
 

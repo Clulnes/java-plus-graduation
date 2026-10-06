@@ -4,6 +4,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -34,8 +35,14 @@ public class ErrorHandler {
                 .build();
     }
 
-    @ExceptionHandler({MethodArgumentNotValidException.class, ValidationException.class,
-            MissingServletRequestParameterException.class, ConstraintViolationException.class})
+    @ExceptionHandler({
+            MethodArgumentNotValidException.class,
+            ValidationException.class,
+            MissingServletRequestParameterException.class,
+            ConstraintViolationException.class,
+            IllegalArgumentException.class,
+            HttpMessageNotReadableException.class
+    })
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiError handleBadRequestException(final Exception ex) {
         String reason = "Неправильно созданный запрос.";
@@ -49,7 +56,7 @@ public class ErrorHandler {
                             error.getField(), error.getDefaultMessage(), error.getRejectedValue()))
                     .collect(Collectors.joining("; "));
         } else {
-            log.error("Получен статус 400 Bad Request (валидация параметров): {}", ex.getMessage(), ex);
+            log.error("Получен статус 400 Bad Request: {}", ex.getMessage(), ex);
             errorMessage = ex.getMessage();
         }
 
