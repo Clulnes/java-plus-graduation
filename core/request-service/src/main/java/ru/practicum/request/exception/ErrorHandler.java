@@ -1,6 +1,8 @@
 package ru.practicum.request.exception;
 
+import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -15,9 +17,9 @@ import java.util.Collections;
 @RestControllerAdvice
 public class ErrorHandler {
 
-    @ExceptionHandler(NotFoundException.class)
+    @ExceptionHandler({NotFoundException.class, FeignException.NotFound.class})
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ApiError handleNotFound(final NotFoundException e) {
+    public ApiError handleNotFound(final Exception e) {
         log.error("404 Not Found: {}", e.getMessage());
         return ApiError.builder()
                 .errors(Collections.emptyList())
@@ -28,9 +30,9 @@ public class ErrorHandler {
                 .build();
     }
 
-    @ExceptionHandler(ConflictException.class)
+    @ExceptionHandler({ConflictException.class, DataIntegrityViolationException.class})
     @ResponseStatus(HttpStatus.CONFLICT)
-    public ApiError handleConflict(final ConflictException e) {
+    public ApiError handleConflict(final Exception e) {
         log.error("409 Conflict: {}", e.getMessage());
         return ApiError.builder()
                 .errors(Collections.emptyList())
