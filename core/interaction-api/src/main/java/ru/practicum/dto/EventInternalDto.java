@@ -15,7 +15,7 @@ public class EventInternalDto {
     private Long id;
     private String title;
     private Long initiatorId;
-    private String state;
+    private EventState state;
     private Integer participantLimit;
     private Integer confirmedRequests;
     private Boolean requestModeration;

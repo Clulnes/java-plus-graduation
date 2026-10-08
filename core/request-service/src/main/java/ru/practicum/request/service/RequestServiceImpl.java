@@ -6,7 +6,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.client.EventClient;
 import ru.practicum.client.UserClient;
-import ru.practicum.dto.*;
+import ru.practicum.dto.EventInternalDto;
+import ru.practicum.dto.EventRequestStatusUpdateRequest;
+import ru.practicum.dto.EventRequestStatusUpdateResult;
+import ru.practicum.dto.EventState;
+import ru.practicum.dto.ParticipationRequestDto;
+import ru.practicum.dto.RequestStatus;
 import ru.practicum.request.dao.RequestRepository;
 import ru.practicum.request.exception.ConflictException;
 import ru.practicum.request.exception.NotFoundException;
@@ -121,7 +126,7 @@ public class RequestServiceImpl {
     public ParticipationRequestDto sendRequest(Long userId, Long eventId) {
         EventInternalDto event = eventClient.getEventById(eventId);
 
-        if (!"PUBLISHED".equalsIgnoreCase(event.getState())) {
+        if (event.getState() !=  EventState.PUBLISHED) {
             throw new ConflictException("Field: eventId. Error: event не найден. Value: " + eventId);
         }
 

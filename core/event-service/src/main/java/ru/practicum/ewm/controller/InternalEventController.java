@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.EventInternalDto;
+import ru.practicum.dto.EventState;
 import ru.practicum.ewm.dao.EventRepository;
 import ru.practicum.ewm.exception.NotFoundException;
 import ru.practicum.ewm.model.Event;
@@ -24,7 +25,7 @@ public class InternalEventController {
                 .id(event.getId())
                 .title(event.getTitle())
                 .initiatorId(event.getInitiator().getId())
-                .state(event.getState().name())
+                .state(EventState.valueOf(event.getState().name()))
                 .participantLimit(event.getParticipantLimit())
                 .confirmedRequests(event.getConfirmedRequests())
                 .requestModeration(event.getRequestModeration())
