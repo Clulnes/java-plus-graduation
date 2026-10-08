@@ -16,6 +16,7 @@ import ru.practicum.comment.exception.ConflictException;
 import ru.practicum.comment.exception.NotFoundException;
 import ru.practicum.comment.model.Comment;
 import ru.practicum.dto.EventInternalDto;
+import ru.practicum.dto.EventState;
 import ru.practicum.dto.UserDto;
 
 import java.time.LocalDateTime;
@@ -36,7 +37,7 @@ public class CommentServiceImpl {
         UserDto user = userClient.getUserById(userId);
         EventInternalDto event = eventClient.getEventById(eventId);
 
-        if (!"PUBLISHED".equalsIgnoreCase(event.getState())) {
+        if (event.getState() !=  EventState.PUBLISHED) {
             throw new ConflictException("Cannot comment on an unpublished event");
         }
 
