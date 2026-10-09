@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${STATS_DB_URL:jdbc:postgresql://localhost:6542/stats}
-    username: ${STATS_DB_USER:root}
-    password: ${STATS_DB_PASSWORD:root}
+    url: ${MAIN_DB_URL:jdbc:postgresql://localhost:6541/ewm-main}
+    username: ${MAIN_DB_USER:main}
+    password: ${MAIN_DB_PASSWORD:main}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
