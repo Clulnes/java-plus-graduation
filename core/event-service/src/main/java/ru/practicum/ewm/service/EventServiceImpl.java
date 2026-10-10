@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +37,8 @@ public class EventServiceImpl implements EventService {
     private final CategoryRepository categoryRepository;
     private final StatClient statClient;
     private final UserClient userClient;
+    private final ru.practicum.stats.client.RecommendationClient recommendationClient;
+    private final ru.practicum.client.RequestClient requestClient;
 
     @Override
     @Transactional
@@ -186,8 +189,7 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    public EventFullDto getPublicEventById(Long id,
-                                           HttpServletRequest request) {
+    public EventFullDto getPublicEventById(Long id, Long userId, HttpServletRequest request) {
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Событие с id=" + id + " не найдено"));
 
@@ -195,17 +197,17 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException("Событие с id=" + id + " не найдено");
         }
 
-        String uri = "/events/" + id;
+        if (userId != null) {
+            recommendationClient.sendUserAction(userId, id, ru.practicum.ewm.stats.proto.ActionTypeProto.ACTION_VIEW);
+        }
 
-        statClient.hit(
-                "ewm-main-service",
-                uri,
-                request.getRemoteAddr(),
-                LocalDateTime.now()
-        );
+        Double rating = recommendationClient.getInteractionsCount(List.of(id)).getOrDefault(id, 0.0);
 
-        ViewStatsDto stat = getStatByEvent(event, true);
-        return EventMapper.toFullDto(event, stat.getHits());
+        EventFullDto dto = EventMapper.toFullDto(event, rating.longValue());
+        dto.setRating(rating);
+        dto.setViews(rating.longValue());
+
+        return dto;
     }
 
     @Override
@@ -297,6 +299,44 @@ public class EventServiceImpl implements EventService {
         ViewStatsDto stat = getStatByEvent(event, false);
 
         return EventMapper.toFullDto(event, stat.getHits());
+    }
+
+    @Override
+    public List<EventShortDto> getRecommendations(Long userId, int size) {
+        var recommendations = recommendationClient.getRecommendationsForUser(userId, size);
+        if (recommendations.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> eventIds = recommendations.stream().map(r -> r.getEventId()).toList();
+        Map<Long, Double> scores = recommendations.stream().collect(Collectors.toMap(r -> r.getEventId(), r -> r.getScore()));
+
+        return eventRepository.findAllById(eventIds).stream()
+                .sorted(Comparator.comparingDouble((Event e) -> scores.getOrDefault(e.getId(), 0.0)).reversed())
+                .map(e -> {
+                    Double rating = scores.getOrDefault(e.getId(), 0.0);
+                    EventShortDto dto = EventMapper.toShortDto(e, rating.longValue());
+                    dto.setRating(rating);
+                    return dto;
+                })
+                .toList();
+    }
+
+    @Override
+    public void addLike(Long userId, Long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event not found"));
+
+        Boolean attended = false;
+        try {
+            attended = requestClient.checkConfirmed(userId, eventId);
+        } catch (Exception ignored) {
+        }
+
+        if (!Boolean.TRUE.equals(attended)) {
+            throw new ValidationException("User has not attended event id=" + eventId);
+        }
+
+        recommendationClient.sendUserAction(userId, eventId, ru.practicum.ewm.stats.proto.ActionTypeProto.ACTION_LIKE);
     }
 
     private Location getLocation(Float Lat, Float Lon) {

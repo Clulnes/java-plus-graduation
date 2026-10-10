@@ -18,10 +18,13 @@ public interface EventService {
     List<EventShortDto> getPublicEvents(EventSearchParams params,
                                         HttpServletRequest request);
 
-    EventFullDto getPublicEventById(Long id,
-                                    HttpServletRequest request);
-
     List<EventFullDto> getEventsByAdmin(AdminEventSearchParams params);
 
     EventFullDto updateEventByAdmin(Long eventId, UpdateEventAdminRequest request);
+
+    EventFullDto getPublicEventById(Long id, Long userId, HttpServletRequest request);
+
+    List<EventShortDto> getRecommendations(Long userId, int size);
+
+    void addLike(Long userId, Long eventId);
 }
