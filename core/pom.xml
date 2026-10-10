@@ -19,6 +19,10 @@
         <module>request-service</module>
         <module>user-service</module>
         <module>comment-service</module>
+        <module>serialization</module>
+        <module>collector</module>
+        <module>aggregator</module>
+        <module>analyzer</module>
     </modules>
 
     <properties>

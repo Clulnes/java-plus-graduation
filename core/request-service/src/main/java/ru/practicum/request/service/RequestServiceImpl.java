@@ -17,6 +17,7 @@ import ru.practicum.request.exception.ConflictException;
 import ru.practicum.request.exception.NotFoundException;
 import ru.practicum.request.exception.ValidationException;
 import ru.practicum.request.model.ParticipationRequest;
+import ru.practicum.stats.client.RecommendationClient;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public class RequestServiceImpl {
     private final RequestRepository requestRepository;
     private final EventClient eventClient;
     private final UserClient userClient;
+    private final RecommendationClient recommendationClient;
 
     public List<ParticipationRequestDto> getRequestsByEventId(Long ownerId, Long eventId) {
         getEventIfExistWithOwnerValidation(eventId, ownerId);
@@ -165,6 +167,7 @@ public class RequestServiceImpl {
         }
 
         request = requestRepository.save(request);
+        recommendationClient.sendUserAction(userId, eventId, ru.practicum.ewm.stats.proto.ActionTypeProto.ACTION_REGISTER);
         return toDto(request);
     }
 
@@ -199,5 +202,10 @@ public class RequestServiceImpl {
                 .status(request.getStatus())
                 .created(request.getCreated())
                 .build();
+    }
+
+    public boolean hasConfirmedRequest(Long userId, Long eventId) {
+        return requestRepository.findAllByRequesterId(userId).stream()
+                .anyMatch(r -> r.getEventId().equals(eventId) && r.getStatus() == RequestStatus.CONFIRMED);
     }
 }

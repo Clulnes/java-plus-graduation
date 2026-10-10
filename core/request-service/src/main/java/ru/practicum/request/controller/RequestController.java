@@ -53,4 +53,9 @@ public class RequestController {
                                                                          @Valid @RequestBody EventRequestStatusUpdateRequest request) {
         return requestService.updateOwnParticipationRequests(userId, eventId, request);
     }
+
+    @GetMapping("/internal/requests/check-confirmed")
+    public Boolean checkConfirmed(@RequestParam Long userId, @RequestParam Long eventId) {
+        return requestService.hasConfirmedRequest(userId, eventId);
+    }
 }
