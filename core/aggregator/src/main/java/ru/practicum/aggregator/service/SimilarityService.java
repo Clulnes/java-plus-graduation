@@ -11,6 +11,7 @@ import ru.practicum.ewm.stats.avro.UserActionAvro;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,19 +25,16 @@ public class SimilarityService {
 
     @Value("${topics.events-similarity:stats.events-similarity.v1}")
     private String eventsSimilarityTopic;
-
     private final Map<Long, Map<Long, Double>> eventUserWeights = new ConcurrentHashMap<>();
+    private final Map<Long, Set<Long>> userEvents = new ConcurrentHashMap<>();
     private final Map<Long, Double> eventWeightSums = new ConcurrentHashMap<>();
     private final Map<Long, Map<Long, Double>> minWeightsSums = new ConcurrentHashMap<>();
-    private final Set<Long> allEvents = ConcurrentHashMap.newKeySet();
 
     public void processUserAction(UserActionAvro action) {
         long userId = action.getUserId();
         long eventId = action.getEventId();
         double newActionWeight = getWeight(action.getActionType());
         Instant timestamp = action.getTimestamp();
-
-        allEvents.add(eventId);
 
         Map<Long, Double> userWeights = eventUserWeights.computeIfAbsent(eventId, k -> new ConcurrentHashMap<>());
         double oldWeight = userWeights.getOrDefault(userId, 0.0);
@@ -47,15 +45,17 @@ public class SimilarityService {
 
         double newWeight = newActionWeight;
         userWeights.put(userId, newWeight);
-
+        Set<Long> eventsOfUser = userEvents.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet());
+        eventsOfUser.add(eventId);
         double deltaWeight = newWeight - oldWeight;
         double newEventWeightSum = eventWeightSums.merge(eventId, deltaWeight, Double::sum);
 
-        for (Long otherEventId : allEvents) {
-            if (otherEventId.equals(eventId)) {
-                continue;
-            }
+        List<Long> otherEvents = eventsOfUser.stream()
+                .filter(otherId -> !otherId.equals(eventId))
+                .sorted()
+                .toList();
 
+        for (Long otherEventId : otherEvents) {
             double otherEventWeightSum = eventWeightSums.getOrDefault(otherEventId, 0.0);
             if (otherEventWeightSum <= 0) {
                 continue;
@@ -63,9 +63,15 @@ public class SimilarityService {
 
             Map<Long, Double> otherUserWeights = eventUserWeights.getOrDefault(otherEventId, Collections.emptyMap());
             double userWeightOnOther = otherUserWeights.getOrDefault(userId, 0.0);
+
+            if (userWeightOnOther <= 0) {
+                continue;
+            }
+
             double oldMin = Math.min(oldWeight, userWeightOnOther);
             double newMin = Math.min(newWeight, userWeightOnOther);
             double deltaMin = newMin - oldMin;
+
             long first = Math.min(eventId, otherEventId);
             long second = Math.max(eventId, otherEventId);
 
@@ -88,7 +94,7 @@ public class SimilarityService {
                 String messageKey = first + ":" + second;
                 kafkaTemplate.send(eventsSimilarityTopic, messageKey, similarityAvro);
 
-                log.info("Calculated similarity for events ({}, {}): score={}", first, second, similarity);
+                log.info("Sent similarity update for pair ({}, {}): score={}", first, second, similarity);
             }
         }
     }
