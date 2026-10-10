@@ -19,7 +19,7 @@ public class GeneralAvroSerializer implements Serializer<SpecificRecordBase> {
             return null;
         }
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(out, null);
+            BinaryEncoder encoder = EncoderFactory.get().directBinaryEncoder(out, null);
             DatumWriter<SpecificRecordBase> writer = new SpecificDatumWriter<>(data.getSchema());
             writer.write(data, encoder);
             encoder.flush();

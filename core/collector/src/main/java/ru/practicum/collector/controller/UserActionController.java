@@ -42,7 +42,7 @@ public class UserActionController extends UserActionControllerGrpc.UserActionCon
                 .setTimestamp(timestamp)
                 .build();
 
-        kafkaTemplate.send(userActionsTopic, String.valueOf(avro.getUserId()), avro);
+        kafkaTemplate.send(userActionsTopic, avro);
 
         responseObserver.onNext(Empty.getDefaultInstance());
         responseObserver.onCompleted();
